@@ -91,7 +91,7 @@ jobs:
             printf '%s' "$GOOGLE_SERVICES_JSON" > flauncher-jmgo/android/app/google-services.json
             echo "using google-services.json from secret"
           else
-            cp .github/placeholders/google-services.json flauncher-jmgo/android/app/google-services.json
+            cp .github/placeholders/google-services.placeholder.json flauncher-jmgo/android/app/google-services.json
             echo "::warning::google-services.json secret is missing; building with a placeholder Firebase configuration"
           fi
       - name: Flutter dependencies, analysis and tests

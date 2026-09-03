@@ -75,6 +75,11 @@ android {
         }
     }
 
+    testOptions {
+        // Robolectric tests read the merged manifest (accessibility service declaration) and resources.
+        unitTests.includeAndroidResources = true
+    }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -96,4 +101,5 @@ dependencies {
     implementation project(':input-core')
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.10.3'
 }

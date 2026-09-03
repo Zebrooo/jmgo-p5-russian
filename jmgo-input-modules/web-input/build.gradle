@@ -19,10 +19,13 @@ android {
 
     testOptions {
         unitTests.returnDefaultValues = true
+        // Robolectric needs the library manifest, theme resources and the JS asset.
+        unitTests.includeAndroidResources = true
     }
 }
 
 dependencies {
     implementation project(':input-core')
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.10.3'
 }

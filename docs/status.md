@@ -77,8 +77,8 @@
 - `Settings.ACTION_HOME_SETTINGS` и `ACTION_ACCESSIBILITY_SETTINGS` могут отсутствовать в прошивке; предусмотрен
   fallback на общий экран настроек.
 - Размеры WebView-клавиатуры фиксированы (412 dp) и не учитывают overscan.
-- В песочнице разработки недоступны `dl.google.com` и Android SDK: Gradle-сборки Android не запускались здесь,
-  проверены компиляция Java/Kotlin против `android-all` и JVM-тесты. Полная сборка — в GitHub Actions.
+- В песочнице разработки недоступны `dl.google.com` и Android SDK, поэтому локально проверены компиляция
+  Java/Kotlin против `android-all` и JVM-тесты. Полные Gradle-сборки всех компонентов подтверждены в GitHub Actions.
 
 ## Результаты локальной проверки (2026-09-03)
 
@@ -92,4 +92,4 @@
 | FLauncher `flutter analyze` | без замечаний |
 | FLauncher `flutter test` | 142/142 |
 | Компиляция Java/Kotlin против android-all 13 | без ошибок |
-| Gradle `assembleDebug` (Android SDK) | не запускалась в песочнике, см. CI |
+| Gradle `assembleDebug` всех компонентов | зелёный в GitHub Actions (run 33747951587 на `main`, коммит `4f76583`) |

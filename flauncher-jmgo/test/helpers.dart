@@ -20,3 +20,6 @@ Element? findSettingsIcon(WidgetTester tester) {
   }
   return null;
 }
+
+Element findWifiIcon(WidgetTester tester) =>
+    tester.element(find.descendant(of: find.byKey(Key("wifi_status")), matching: find.byType(Icon)));

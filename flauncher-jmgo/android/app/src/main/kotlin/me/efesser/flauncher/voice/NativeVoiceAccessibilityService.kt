@@ -15,12 +15,15 @@ import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
 import me.efesser.flauncher.R
 import org.jmgo.input.core.InputContract
+import org.jmgo.input.core.MicrophoneKeyDebouncer
+import org.jmgo.input.core.MicrophoneKeyPolicy
 import org.jmgo.input.core.VoiceRoute
 import org.jmgo.input.core.VoiceSessionGate
 import java.util.UUID
 
 class NativeVoiceAccessibilityService : AccessibilityService() {
     private val sessionGate = VoiceSessionGate(InputContract.DEFAULT_SESSION_TIMEOUT_MS)
+    private val keyDebouncer = MicrophoneKeyDebouncer()
     private lateinit var capabilityResolver: WebCapabilityResolver
     private var originPackage: String? = null
     private var originWindowId: Int? = null
@@ -51,14 +54,22 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
             registerReceiver(resultReceiver, filter)
         }
         resultReceiverRegistered = true
+        VoiceDiagnostics.serviceConnected(System.currentTimeMillis())
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        val isMicrophoneKey = event.keyCode == MicrophoneKeyPolicy.MICROPHONE_KEY_CODE
+        VoiceDiagnostics.keyEventSeenByService(isMicrophoneKey, System.currentTimeMillis())
         if (!NativeVoicePolicy.shouldConsume(event.keyCode, event.action, event.repeatCount)) return false
+        val now = SystemClock.elapsedRealtime()
+        // A bounced second KEY_DOWN is swallowed so it cannot cancel the recognition it just started.
+        if (!keyDebouncer.accept(event.keyCode, event.action, event.repeatCount, now)) return true
+
         val root = rootInActiveWindow
         val currentPackage = root?.packageName?.toString()
 
-        if (currentPackage == InputContract.FUTO_PACKAGE || sessionGate.isActive(SystemClock.elapsedRealtime())) {
+        if (currentPackage == InputContract.FUTO_PACKAGE || sessionGate.isActive(now)) {
+            AndroidEditableTarget.release(root)
             sendBroadcast(Intent(InputContract.ACTION_FINISH_RECOGNITION).setPackage(InputContract.FUTO_PACKAGE))
             return true
         }
@@ -68,14 +79,20 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
             currentPackage?.let { capabilityResolver.resolve(it) } != null,
         )
         if (route == VoiceRoute.NONE || currentPackage == null) {
+            AndroidEditableTarget.release(root)
+            VoiceDiagnostics.record(VoiceDiagnostics.Outcome.NO_FOREGROUND_WINDOW, System.currentTimeMillis())
             Toast.makeText(this, R.string.native_voice_no_field, Toast.LENGTH_SHORT).show()
             return true
         }
 
         val sessionId = UUID.randomUUID().toString()
-        if (!sessionGate.start(sessionId, SystemClock.elapsedRealtime())) return true
+        if (!sessionGate.start(sessionId, now)) {
+            AndroidEditableTarget.release(root)
+            return true
+        }
         originPackage = currentPackage
         originWindowId = root.windowId
+        AndroidEditableTarget.release(root)
 
         try {
             if (route == VoiceRoute.WEB) {
@@ -88,15 +105,18 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
                         .putExtra(InputContract.EXTRA_SESSION_ID, sessionId)
                         .putExtra(InputContract.EXTRA_ORIGIN_PACKAGE, currentPackage),
                 )
+                VoiceDiagnostics.record(VoiceDiagnostics.Outcome.ROUTED_TO_WEB_HOST, System.currentTimeMillis())
                 clearSession()
             } else {
                 startActivity(
                     NativeVoiceCaptureActivity.intent(this, sessionId, currentPackage)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
+                VoiceDiagnostics.record(VoiceDiagnostics.Outcome.SESSION_STARTED, System.currentTimeMillis())
             }
         } catch (_: RuntimeException) {
             clearSession()
+            VoiceDiagnostics.record(VoiceDiagnostics.Outcome.RECOGNIZER_MISSING, System.currentTimeMillis())
             Toast.makeText(this, R.string.native_voice_unavailable, Toast.LENGTH_SHORT).show()
         }
         return true
@@ -116,6 +136,7 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
             intent.getStringExtra(InputContract.EXTRA_RESULT),
         )
         if (result == null || sessionId == null) {
+            VoiceDiagnostics.record(VoiceDiagnostics.Outcome.RESULT_EMPTY_OR_STALE, System.currentTimeMillis())
             clearSession()
             return
         }
@@ -130,6 +151,7 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
         val expectedOrigin = originPackage
         if (expectedOrigin == null || !sessionGate.isActive(now) || now > pending.deadlineMs) {
             clearSession()
+            VoiceDiagnostics.record(VoiceDiagnostics.Outcome.FIELD_OR_WINDOW_LOST, System.currentTimeMillis())
             Toast.makeText(this, R.string.native_voice_field_lost, Toast.LENGTH_SHORT).show()
             return
         }
@@ -140,6 +162,7 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
         val target = if (root != null && currentPackage == expectedOrigin && sameWindow) {
             AndroidEditableTarget.find(root, expectedOrigin)
         } else {
+            AndroidEditableTarget.release(root)
             null
         }
 
@@ -150,13 +173,17 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
                 target != null,
             )
         ) {
+            AndroidEditableTarget.release(target)
             scheduleRetry()
             return
         }
 
-        if (AndroidEditableTarget.setTextAndSubmit(target!!, pending.text)) {
+        val inserted = AndroidEditableTarget.setTextAndSubmit(target!!, pending.text)
+        AndroidEditableTarget.release(target)
+        if (inserted) {
             sessionGate.accept(pending.sessionId, now)
             clearSession()
+            VoiceDiagnostics.record(VoiceDiagnostics.Outcome.INSERTED, System.currentTimeMillis())
         } else {
             scheduleRetry()
         }
@@ -176,6 +203,8 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // The window/focus event stream is the primary trigger; the retry timer only covers
+        // firmware that reports no event after the recognizer window closes.
         if (pendingResult != null) tryApplyPendingResult()
     }
 
@@ -189,6 +218,7 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
             resultReceiverRegistered = false
         }
         clearSession()
+        VoiceDiagnostics.serviceDisconnected()
         super.onDestroy()
     }
 
@@ -198,7 +228,7 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
         val deadlineMs: Long,
     )
 
-    private companion object {
+    companion object {
         const val WINDOW_RESTORE_TIMEOUT_MS = 5_000L
         const val WINDOW_RETRY_INTERVAL_MS = 100L
     }

@@ -158,4 +158,94 @@ void main() {
 
     expect(called, isTrue);
   });
+
+  test("getVoiceSetupStatus", () async {
+    final channel = MethodChannel('me.efesser.flauncher/method');
+    channel.setMockMethodCallHandler((call) async {
+      if (call.method == "getVoiceSetupStatus") {
+        return {
+          'recognizerInstalled': true,
+          'microphoneGranted': false,
+          'accessibilityEnabled': true,
+          'defaultLauncher': false,
+          'complete': false,
+        };
+      }
+      fail("Unhandled method name");
+    });
+    final fLauncherChannel = FLauncherChannel();
+
+    final status = await fLauncherChannel.getVoiceSetupStatus();
+
+    expect(status['recognizerInstalled'], isTrue);
+    expect(status['microphoneGranted'], isFalse);
+    expect(status['complete'], isFalse);
+  });
+
+  test("getVoiceDiagnostics", () async {
+    final channel = MethodChannel('me.efesser.flauncher/method');
+    channel.setMockMethodCallHandler((call) async {
+      if (call.method == "getVoiceDiagnostics") {
+        return {'keyEventsSeenByService': 3, 'lastOutcome': 'INSERTED'};
+      }
+      fail("Unhandled method name");
+    });
+    final fLauncherChannel = FLauncherChannel();
+
+    final diagnostics = await fLauncherChannel.getVoiceDiagnostics();
+
+    expect(diagnostics['keyEventsSeenByService'], 3);
+    expect(diagnostics['lastOutcome'], 'INSERTED');
+  });
+
+  for (final method in ["openAccessibilitySettings", "openHomeSettings", "openRecognizerSettings"]) {
+    test(method, () async {
+      final channel = MethodChannel('me.efesser.flauncher/method');
+      bool called = false;
+      channel.setMockMethodCallHandler((call) async {
+        if (call.method == method) {
+          called = true;
+          return;
+        }
+        fail("Unhandled method name");
+      });
+      final fLauncherChannel = FLauncherChannel();
+
+      switch (method) {
+        case "openAccessibilitySettings":
+          await fLauncherChannel.openAccessibilitySettings();
+          break;
+        case "openHomeSettings":
+          await fLauncherChannel.openHomeSettings();
+          break;
+        case "openRecognizerSettings":
+          await fLauncherChannel.openRecognizerSettings();
+          break;
+      }
+
+      expect(called, isTrue);
+    });
+  }
+
+  test("setVoiceSetupRequestedListener reacts to openVoiceSetup from native", () async {
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    final fLauncherChannel = FLauncherChannel();
+    int requested = 0;
+    fLauncherChannel.setVoiceSetupRequestedListener(() => requested += 1);
+
+    final codec = StandardMethodCodec();
+    await binding.defaultBinaryMessenger.handlePlatformMessage(
+      'me.efesser.flauncher/method',
+      codec.encodeMethodCall(MethodCall('openVoiceSetup')),
+      (_) {},
+    );
+    await binding.defaultBinaryMessenger.handlePlatformMessage(
+      'me.efesser.flauncher/method',
+      codec.encodeMethodCall(MethodCall('somethingElse')),
+      (_) {},
+    );
+
+    expect(requested, 1);
+    fLauncherChannel.setVoiceSetupRequestedListener(null);
+  });
 }

@@ -7,10 +7,30 @@ import org.jmgo.input.core.EditableCandidate
 import org.jmgo.input.core.EditableTargetPolicy
 
 object AndroidEditableTarget {
-    fun find(root: AccessibilityNodeInfo, originPackage: String): AccessibilityNodeInfo? {
-        val nodes = ArrayList<AccessibilityNodeInfo>()
-        flatten(root, nodes)
-        val candidates = nodes.map { node ->
+    /** Upper bound for one breadth-first walk so a huge WebView or list tree cannot stall the service. */
+    const val MAX_NODES = 1_500
+
+    /**
+     * Finds the safe editable target inside [root] for [originPackage].
+     *
+     * Every node visited during the walk, [root] included, is released before returning except
+     * the node that is handed back to the caller. The caller owns that node and must pass it to
+     * [release] once it is no longer needed.
+     */
+    fun find(root: AccessibilityNodeInfo, originPackage: String, maxNodes: Int = MAX_NODES): AccessibilityNodeInfo? {
+        val visited = ArrayList<AccessibilityNodeInfo>(minOf(maxNodes, 256))
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.addLast(root)
+        while (queue.isNotEmpty() && visited.size < maxNodes) {
+            val node = queue.removeFirst()
+            visited += node
+            val childCount = node.childCount
+            for (index in 0 until childCount) {
+                if (visited.size + queue.size >= maxNodes) break
+                node.getChild(index)?.let(queue::addLast)
+            }
+        }
+        val candidates = visited.map { node ->
             EditableCandidate(
                 node.packageName?.toString(),
                 node.isEditable,
@@ -19,7 +39,10 @@ object AndroidEditableTarget {
                 node.isFocused || node.isAccessibilityFocused,
             )
         }
-        return nodes.getOrNull(EditableTargetPolicy.select(candidates, originPackage))
+        val target = visited.getOrNull(EditableTargetPolicy.select(candidates, originPackage))
+        for (node in visited) if (node !== target) release(node)
+        for (node in queue) release(node)
+        return target
     }
 
     fun setTextAndSubmit(node: AccessibilityNodeInfo, text: String): Boolean {
@@ -37,10 +60,10 @@ object AndroidEditableTarget {
         return true
     }
 
-    private fun flatten(node: AccessibilityNodeInfo, output: MutableList<AccessibilityNodeInfo>) {
-        output += node
-        for (index in 0 until node.childCount) {
-            node.getChild(index)?.let { flatten(it, output) }
-        }
+    /** Returns the node to the framework pool on firmware older than Android 13, where it is not a no-op. */
+    fun release(node: AccessibilityNodeInfo?) {
+        if (node == null || Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
+        @Suppress("DEPRECATION")
+        runCatching { node.recycle() }
     }
 }

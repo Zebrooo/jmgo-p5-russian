@@ -5,8 +5,6 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.RecognizerIntent
 import android.widget.Toast
 import me.efesser.flauncher.R
@@ -65,14 +63,16 @@ class NativeVoiceCaptureActivity : Activity() {
     }
 
     private fun publishResult(result: String) {
-        val application = applicationContext
-        val broadcast = Intent(InputContract.ACTION_NATIVE_VOICE_RESULT)
-            .setPackage(packageName)
-            .putExtra(InputContract.EXTRA_SESSION_ID, sessionId)
-            .putExtra(InputContract.EXTRA_ORIGIN_PACKAGE, originPackage)
-            .putExtra(InputContract.EXTRA_RESULT, result)
+        // No artificial delay: the accessibility service holds the result until the originating
+        // window is back in front and re-reads the accessibility tree at that moment.
+        sendBroadcast(
+            Intent(InputContract.ACTION_NATIVE_VOICE_RESULT)
+                .setPackage(packageName)
+                .putExtra(InputContract.EXTRA_SESSION_ID, sessionId)
+                .putExtra(InputContract.EXTRA_ORIGIN_PACKAGE, originPackage)
+                .putExtra(InputContract.EXTRA_RESULT, result),
+        )
         finish()
-        Handler(Looper.getMainLooper()).postDelayed({ application.sendBroadcast(broadcast) }, 300L)
     }
 
     companion object {

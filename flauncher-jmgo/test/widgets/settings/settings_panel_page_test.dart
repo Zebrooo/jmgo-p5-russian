@@ -22,6 +22,7 @@ import 'package:flauncher/widgets/settings/applications_panel_page.dart';
 import 'package:flauncher/widgets/settings/categories_panel_page.dart';
 import 'package:flauncher/widgets/settings/flauncher_about_dialog.dart';
 import 'package:flauncher/widgets/settings/settings_panel_page.dart';
+import 'package:flauncher/widgets/settings/voice_setup_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -124,6 +125,29 @@ void main() {
     verify(appsService.openSettings());
   });
 
+  testWidgets("'Voice input' opens VoiceSetupPanelPage", (tester) async {
+    final settingsService = MockSettingsService();
+    final appsService = MockAppsService();
+    when(appsService.categoriesWithApps).thenReturn([]);
+    when(appsService.applications).thenReturn([]);
+    when(settingsService.crashReportsEnabled).thenReturn(false);
+    when(settingsService.analyticsEnabled).thenReturn(false);
+    when(settingsService.use24HourTimeFormat).thenReturn(false);
+    when(settingsService.appHighlightAnimationEnabled).thenReturn(true);
+
+    await _pumpWidgetWithProviders(tester, settingsService, appsService);
+
+    expect(find.text("Голосовой ввод"), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key("VoiceSetupPanelPage")), findsOneWidget);
+  });
+
   testWidgets("'Use 24-hour time format' toggle calls SettingsService", (tester) async {
     final settingsService = MockSettingsService();
     final appsService = MockAppsService();
@@ -141,7 +165,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     verify(settingsService.setUse24HourTimeFormat(true));
   });
@@ -165,7 +191,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     verify(settingsService.setCrashReportsEnabled(true));
   });
@@ -190,7 +218,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     verify(settingsService.setAnalyticsEnabled(true));
   });
@@ -217,7 +247,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(find.byType(FLauncherAboutDialog), findsOneWidget);
   });
@@ -239,6 +271,7 @@ Future<void> _pumpWidgetWithProviders(
           CategoriesPanelPage.routeName: (_) => Container(key: Key("CategoriesPanelPage")),
           WallpaperPanelPage.routeName: (_) => Container(key: Key("WallpaperPanelPage")),
           ApplicationsPanelPage.routeName: (_) => Container(key: Key("ApplicationsPanelPage")),
+          VoiceSetupPanelPage.routeName: (_) => Container(key: Key("VoiceSetupPanelPage")),
         },
         home: Material(child: SettingsPanelPage()),
       ),

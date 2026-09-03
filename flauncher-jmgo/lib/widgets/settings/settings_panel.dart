@@ -24,6 +24,7 @@ import 'package:flauncher/widgets/settings/category_panel_page.dart';
 import 'package:flauncher/widgets/settings/gradient_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_panel_page.dart';
 import 'package:flauncher/widgets/settings/unsplash_panel_page.dart';
+import 'package:flauncher/widgets/settings/voice_setup_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -65,6 +66,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     return MaterialPageRoute(builder: (_) => ApplicationsPanelPage());
                   case CategoriesPanelPage.routeName:
                     return MaterialPageRoute(builder: (_) => CategoriesPanelPage());
+                  case VoiceSetupPanelPage.routeName:
+                    return MaterialPageRoute(builder: (_) => VoiceSetupPanelPage());
                   case CategoryPanelPage.routeName:
                     return MaterialPageRoute(
                       builder: (_) => CategoryPanelPage(categoryId: settings.arguments! as int),

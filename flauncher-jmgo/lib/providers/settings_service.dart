@@ -31,6 +31,7 @@ const _appHighlightAnimationEnabledKey = "app_highlight_animation_enabled";
 const _gradientUuidKey = "gradient_uuid";
 const _unsplashEnabledKey = "unsplash_enabled";
 const _unsplashAuthorKey = "unsplash_author";
+const _voiceSetupCheckOnStartKey = "voice_setup_check_on_start";
 
 class SettingsService extends ChangeNotifier {
   final SharedPreferences _sharedPreferences;
@@ -52,6 +53,9 @@ class SettingsService extends ChangeNotifier {
   bool get unsplashEnabled => _firebaseRemoteConfig.getBool(_unsplashEnabledKey);
 
   String? get unsplashAuthor => _sharedPreferences.getString(_unsplashAuthorKey);
+
+  /// Show the voice-input setup screen at start-up while any setup step is still missing.
+  bool get voiceSetupCheckOnStart => _sharedPreferences.getBool(_voiceSetupCheckOnStartKey) ?? true;
 
   SettingsService(
     this._sharedPreferences,
@@ -89,6 +93,11 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> setAppHighlightAnimationEnabled(bool value) async {
     await _sharedPreferences.setBool(_appHighlightAnimationEnabledKey, value);
+    notifyListeners();
+  }
+
+  Future<void> setVoiceSetupCheckOnStart(bool value) async {
+    await _sharedPreferences.setBool(_voiceSetupCheckOnStartKey, value);
     notifyListeners();
   }
 

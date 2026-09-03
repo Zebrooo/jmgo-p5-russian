@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.speech.RecognizerIntent;
 import android.widget.Toast;
 import java.util.ArrayList;
@@ -62,11 +60,10 @@ public final class WebVoiceActivity extends Activity {
     }
 
     private void publishResult(String result) {
-        Intent broadcast = resultBroadcast(result);
-        android.content.Context application = getApplicationContext();
+        // No artificial delay: WebInputController keeps a matching result in memory while the
+        // host is paused and applies it from onResume() once the host is back in front.
+        sendBroadcast(resultBroadcast(result));
         finish();
-        new Handler(Looper.getMainLooper()).postDelayed(
-                () -> application.sendBroadcast(broadcast), 300L);
     }
 
     private void broadcast(String action, String result) {

@@ -22,6 +22,7 @@ import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/applications_panel_page.dart';
 import 'package:flauncher/widgets/settings/categories_panel_page.dart';
 import 'package:flauncher/widgets/settings/flauncher_about_dialog.dart';
+import 'package:flauncher/widgets/settings/voice_setup_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -80,6 +81,17 @@ class SettingsPanelPage extends StatelessWidget {
                   ],
                 ),
                 onPressed: () => context.read<AppsService>().openSettings(),
+              ),
+              TextButton(
+                key: Key("voice_setup"),
+                child: Row(
+                  children: [
+                    Icon(Icons.mic),
+                    Container(width: 8),
+                    Text("Голосовой ввод", style: Theme.of(context).textTheme.bodyMedium),
+                  ],
+                ),
+                onPressed: () => Navigator.of(context).pushNamed(VoiceSetupPanelPage.routeName),
               ),
               Divider(),
               SwitchListTile(

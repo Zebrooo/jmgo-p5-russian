@@ -28,12 +28,15 @@ import android.net.Uri
 import android.net.wifi.WifiManager
 import android.content.Context
 import android.content.IntentFilter
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.BatteryManager
 import android.os.Build
+import android.os.SystemClock
 import android.os.UserHandle
 import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.view.KeyEvent
+import android.view.accessibility.AccessibilityManager
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -45,17 +48,28 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.Serializable
 import java.util.UUID
+import me.efesser.flauncher.setup.AccessibilityServiceSetting
+import me.efesser.flauncher.setup.LauncherVoiceFallbackPolicy
+import me.efesser.flauncher.setup.VoiceSetupSnapshot
+import me.efesser.flauncher.voice.NativeVoiceAccessibilityService
 import me.efesser.flauncher.voice.NativeVoiceCaptureActivity
+import me.efesser.flauncher.voice.VoiceDiagnostics
+import org.jmgo.input.core.InputContract
+import org.jmgo.input.core.MicrophoneKeyDebouncer
 
 private const val METHOD_CHANNEL = "me.efesser.flauncher/method"
 private const val EVENT_CHANNEL = "me.efesser.flauncher/event"
 
 class MainActivity : FlutterActivity() {
     val launcherAppsCallbacks = ArrayList<LauncherApps.Callback>()
+    private var methodChannel: MethodChannel? = null
+    private val microphoneDebouncer = MicrophoneKeyDebouncer()
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL).setMethodCallHandler { call, result ->
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
+        methodChannel = channel
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getApplications" -> Thread {
                     val applications = getApplications()
@@ -71,6 +85,11 @@ class MainActivity : FlutterActivity() {
                 "isDefaultLauncher" -> result.success(isDefaultLauncher())
                 "checkForGetContentAvailability" -> result.success(checkForGetContentAvailability())
                 "startAmbientMode" -> result.success(startAmbientMode())
+                "getVoiceSetupStatus" -> result.success(getVoiceSetupStatus().toMap())
+                "getVoiceDiagnostics" -> result.success(VoiceDiagnostics.snapshot())
+                "openAccessibilitySettings" -> result.success(openSettingsScreen(SettingsIntentPolicy.accessibilityAction()))
+                "openHomeSettings" -> result.success(openSettingsScreen(SettingsIntentPolicy.homeAction()))
+                "openRecognizerSettings" -> result.success(openAppInfo(InputContract.FUTO_PACKAGE))
                 else -> throw IllegalArgumentException()
             }
         }
@@ -123,10 +142,30 @@ class MainActivity : FlutterActivity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (VoiceKey.shouldHandle(event.keyCode, event.action, event.repeatCount)) {
-            launchRussianVoiceInput()
+            VoiceDiagnostics.microphoneKeySeenByLauncher(System.currentTimeMillis())
+            if (microphoneDebouncer.accept(event.keyCode, event.action, event.repeatCount, SystemClock.elapsedRealtime())) {
+                handleMicrophoneKeyInLauncher()
+            }
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * The launcher only sees the microphone key when the accessibility service did not consume
+     * it. With the service enabled that means key filtering is not working on this firmware, so
+     * the capture activity is started and the service still inserts the result. With the service
+     * disabled a result could never be inserted anywhere, so the setup screen is shown instead.
+     */
+    private fun handleMicrophoneKeyInLauncher() {
+        when (LauncherVoiceFallbackPolicy.select(isAccessibilityServiceEnabled())) {
+            LauncherVoiceFallbackPolicy.Action.CAPTURE -> if (!launchRussianVoiceInput()) openVoiceSetup()
+            LauncherVoiceFallbackPolicy.Action.SETUP -> openVoiceSetup()
+        }
+    }
+
+    private fun openVoiceSetup() {
+        methodChannel?.invokeMethod("openVoiceSetup", null)
     }
 
     private fun launchRussianVoiceInput() = try {
@@ -137,13 +176,59 @@ class MainActivity : FlutterActivity() {
         ).let(::startActivity)
         true
     } catch (e: Exception) {
+        false
+    }
+
+    private fun getVoiceSetupStatus() = VoiceSetupSnapshot(
+        recognizerInstalled = isRecognizerInstalled(),
+        microphoneGranted = isRecognizerMicrophoneGranted(),
+        accessibilityEnabled = isAccessibilityServiceEnabled(),
+        defaultLauncher = isDefaultLauncher(),
+    )
+
+    @Suppress("DEPRECATION")
+    private fun isRecognizerInstalled() = try {
+        packageManager.resolveActivity(
+            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).setPackage(InputContract.FUTO_PACKAGE),
+            0,
+        ) != null
+    } catch (e: Exception) {
+        false
+    }
+
+    private fun isRecognizerMicrophoneGranted() = try {
+        packageManager.checkPermission(android.Manifest.permission.RECORD_AUDIO, InputContract.FUTO_PACKAGE) ==
+            PackageManager.PERMISSION_GRANTED
+    } catch (e: Exception) {
+        false
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val serviceClass = NativeVoiceAccessibilityService::class.java.name
+        val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+        val viaManager = try {
+            manager?.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                ?.any { it.resolveInfo?.serviceInfo?.let { info ->
+                    info.packageName == packageName && info.name == serviceClass
+                } == true } ?: false
+        } catch (e: Exception) {
+            false
+        }
+        if (viaManager) return true
+        val setting = try {
+            Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+        } catch (e: Exception) {
+            null
+        }
+        return AccessibilityServiceSetting.isEnabled(setting, packageName, serviceClass)
+    }
+
+    private fun openSettingsScreen(action: String) = try {
+        startActivity(Intent(action))
+        true
+    } catch (e: Exception) {
         try {
-            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .setPackage(VoiceKey.RECOGNIZER_PACKAGE)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Говорите")
-                .let(::startActivity)
+            startActivity(Intent(SettingsIntentPolicy.fallbackAction()))
             true
         } catch (fallbackError: Exception) {
             false

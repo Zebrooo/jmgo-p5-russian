@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-dom-tests:
+    name: web-input DOM tests (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test jmgo-input-modules/web-input/src/test/js/jmgo-web-input.test.js
+
+  shared-modules-and-zagonka:
+    name: input-core, web-input, Zagonka (Gradle 7.4 / AGP 7.1.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-33 build-tools;33.0.2"
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-zagonka-${{ hashFiles('zagonka-tv-wrapper/**/*.gradle', 'jmgo-input-modules/**/*.gradle', 'flauncher-jmgo/android/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Unit tests and debug build
+        run: |
+          chmod +x flauncher-jmgo/android/gradlew
+          ./flauncher-jmgo/android/gradlew -p zagonka-tv-wrapper --no-daemon \
+            :input-core:test :web-input:test :app:testDebugUnitTest \
+            :input-core:assemble :web-input:assemble :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zagonka-debug-apk
+          path: zagonka-tv-wrapper/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zagonka-test-reports
+          path: |
+            zagonka-tv-wrapper/app/build/reports/tests
+            jmgo-input-modules/*/build/reports/tests
+          if-no-files-found: ignore
+
+  flauncher:
+    name: FLauncher (Flutter 3.7.5)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-33 build-tools;33.0.2"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.7.5"
+          channel: stable
+          cache: true
+      - name: Install sqlite for drift tests
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+      - name: Firebase configuration
+        # The upstream FLauncher build applies the google-services plugin, which refuses to
+        # build without google-services.json. Provide the real file through the
+        # GOOGLE_SERVICES_JSON secret; without it a placeholder is written so that the build
+        # and the unit tests still run. An APK built with the placeholder is only a build check.
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > flauncher-jmgo/android/app/google-services.json
+            echo "using google-services.json from secret"
+          else
+            cp .github/placeholders/google-services.json flauncher-jmgo/android/app/google-services.json
+            echo "::warning::google-services.json secret is missing; building with a placeholder Firebase configuration"
+          fi
+      - name: Flutter dependencies, analysis and tests
+        working-directory: flauncher-jmgo
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Android local.properties
+        run: |
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > flauncher-jmgo/android/local.properties
+      - name: Kotlin unit tests and debug APK
+        run: |
+          chmod +x flauncher-jmgo/android/gradlew
+          ./flauncher-jmgo/android/gradlew -p flauncher-jmgo/android --no-daemon \
+            app:testDebugUnitTest app:assembleDebug
+      - name: Verify accessibility service manifest
+        run: |
+          set -euo pipefail
+          APK=$(ls flauncher-jmgo/build/app/outputs/apk/debug/*.apk | head -1)
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | head -1)
+          "$AAPT" dump xmltree --file AndroidManifest.xml "$APK" > manifest.txt
+          grep -q 'NativeVoiceAccessibilityService' manifest.txt
+          awk '/E: service/{s=1} s && /NativeVoiceAccessibilityService/{f=1} f && /exported/{print; e=1} f && /permission/{print; p=1} f && /E: intent-filter/{exit} END{exit !(e && p)}' manifest.txt
+          grep -q 'android.permission.BIND_ACCESSIBILITY_SERVICE' manifest.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flauncher-debug-apk
+          path: flauncher-jmgo/build/app/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  futo-voice:
+    name: FUTO Voice Input JMGO (AGP 8.9 / NDK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 cmake;3.22.1 ndk;27.0.12077973"
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-futo-${{ hashFiles('futo-voice-jmgo/**/*.gradle', 'futo-voice-jmgo/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Unit tests and debug build
+        run: |
+          chmod +x futo-voice-jmgo/gradlew
+          ./futo-voice-jmgo/gradlew -p futo-voice-jmgo --no-daemon \
+            testPlayStoreDebugUnitTest assemblePlayStoreDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: futo-voice-jmgo-debug-apk
+          path: futo-voice-jmgo/app/build/outputs/apk/playStore/debug/*.apk
+          if-no-files-found: error

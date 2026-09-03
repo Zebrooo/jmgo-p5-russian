@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flauncher/flauncher_channel.dart';
+import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/widgets/time_widget.dart';
 import 'package:flutter/material.dart';
 
@@ -33,22 +34,27 @@ class SystemStatusWidget extends StatefulWidget {
     Key? key,
     Future<SystemStatus> Function()? loadStatus,
     Future<void> Function()? openWifiSettings,
-    Future<void> Function()? openSystemSettings,
+    Future<void> Function(BuildContext)? openLauncherSettings,
     Widget? timeWidget,
   })  : loadStatus = loadStatus ??
             (() async => SystemStatus.fromMap(
                 await FLauncherChannel().getSystemStatus())),
         openWifiSettings =
             openWifiSettings ?? (() => FLauncherChannel().openWifiSettings()),
-        openSystemSettings =
-            openSystemSettings ?? (() => FLauncherChannel().openSettings()),
+        openLauncherSettings = openLauncherSettings ?? _showSettingsPanel,
         timeWidget = timeWidget ?? TimeWidget(),
         super(key: key);
 
   final Future<SystemStatus> Function() loadStatus;
   final Future<void> Function() openWifiSettings;
-  final Future<void> Function() openSystemSettings;
+
+  /// The launcher's own settings panel; it contains the Android settings shortcut,
+  /// voice-input setup, categories, wallpaper and the about dialog.
+  final Future<void> Function(BuildContext) openLauncherSettings;
   final Widget timeWidget;
+
+  static Future<void> _showSettingsPanel(BuildContext context) =>
+      showDialog(context: context, builder: (_) => SettingsPanel());
 
   @override
   State<SystemStatusWidget> createState() => _SystemStatusWidgetState();
@@ -104,10 +110,10 @@ class _SystemStatusWidgetState extends State<SystemStatusWidget> {
         widget.timeWidget,
         const SizedBox(width: 16),
         IconButton(
-          key: const Key('system_settings'),
-          onPressed: widget.openSystemSettings,
+          key: const Key('launcher_settings'),
+          onPressed: () => widget.openLauncherSettings(context),
           icon: const Icon(Icons.settings_outlined),
-          tooltip: 'Системные настройки',
+          tooltip: 'Настройки',
         ),
         const SizedBox(width: 20),
       ],

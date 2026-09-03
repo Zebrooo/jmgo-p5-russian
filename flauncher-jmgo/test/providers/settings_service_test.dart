@@ -234,4 +234,25 @@ void main() {
       expect(use24HourTimeFormat, isFalse);
     });
   });
+
+  group("voiceSetupCheckOnStart", () {
+    test("defaults to true", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final settingsService = SettingsService(
+          sharedPreferences, MockFirebaseCrashlytics(), MockFirebaseAnalytics(), MockFirebaseRemoteConfig());
+
+      expect(settingsService.voiceSetupCheckOnStart, isTrue);
+    });
+
+    test("is persisted when disabled", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final settingsService = SettingsService(
+          sharedPreferences, MockFirebaseCrashlytics(), MockFirebaseAnalytics(), MockFirebaseRemoteConfig());
+
+      await settingsService.setVoiceSetupCheckOnStart(false);
+
+      expect(settingsService.voiceSetupCheckOnStart, isFalse);
+      expect(sharedPreferences.getBool("voice_setup_check_on_start"), isFalse);
+    });
+  });
 }

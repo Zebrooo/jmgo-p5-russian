@@ -21,6 +21,7 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.util.UUID;
 import org.jmgo.input.core.InputContract;
+import org.jmgo.input.core.MicrophoneKeyDebouncer;
 import org.jmgo.input.core.MicrophoneKeyPolicy;
 import org.jmgo.input.core.VoiceSessionGate;
 
@@ -31,6 +32,7 @@ public final class WebInputController {
     private final WebSiteAdapter siteAdapter;
     private final CursorState cursorState;
     private final VoiceSessionGate voiceSession = new VoiceSessionGate(InputContract.DEFAULT_SESSION_TIMEOUT_MS);
+    private final MicrophoneKeyDebouncer microphoneDebouncer = new MicrophoneKeyDebouncer();
     private final RemoteCursorView cursorView;
     private final TvKeyboardView keyboardView;
     private boolean attached;
@@ -143,7 +145,11 @@ public final class WebInputController {
         }
 
         if (MicrophoneKeyPolicy.shouldHandle(event.getKeyCode(), event.getAction(), event.getRepeatCount())) {
-            startVoiceRecognition();
+            // A bounced second KEY_DOWN must not finish the recognition it has just started.
+            if (microphoneDebouncer.accept(event.getKeyCode(), event.getAction(), event.getRepeatCount(),
+                    SystemClock.elapsedRealtime())) {
+                startVoiceRecognition();
+            }
             return true;
         }
 

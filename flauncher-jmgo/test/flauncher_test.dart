@@ -161,9 +161,11 @@ void main() {
     when(settingsService.appHighlightAnimationEnabled).thenReturn(true);
     await _pumpWidgetWithProviders(tester, wallpaperService, appsService, settingsService);
 
+    // The JMGO app bar holds the Wi-Fi shortcut first and the launcher settings icon at the far right.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
@@ -620,12 +622,19 @@ void main() {
     expect(tv1, isNotNull);
     expect(Focus.of(tv1!).hasFocus, isTrue);
 
+    // Past the end of the first row the focus enters the JMGO app bar: Wi-Fi shortcut first,
+    // then the launcher settings icon to its right.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
 
+    Element wifiIcon = findWifiIcon(tester);
     Element? settingsIcon = findSettingsIcon(tester);
     expect(settingsIcon, isNotNull);
     expect(Focus.of(tv1).hasFocus, isFalse);
+    expect(Focus.of(wifiIcon).hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    expect(Focus.of(wifiIcon).hasFocus, isFalse);
     expect(Focus.of(settingsIcon!).hasFocus, isTrue);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -636,10 +645,13 @@ void main() {
     expect(Focus.of(tv2!).hasFocus, isTrue);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(Focus.of(wifiIcon).hasFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     expect(Focus.of(settingsIcon).hasFocus, isTrue);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     expect(Focus.of(settingsIcon).hasFocus, isTrue);

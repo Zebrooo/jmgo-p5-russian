@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flauncher/widgets/system_status_widget.dart';
 
 void main() {
-  testWidgets('shows wifi and battery percentage and opens their settings',
+  testWidgets('shows wifi and battery percentage and opens wifi and launcher settings',
       (tester) async {
     var wifiOpened = false;
     var settingsOpened = false;
@@ -19,7 +19,7 @@ void main() {
             batteryPercent: 48,
           ),
           openWifiSettings: () async => wifiOpened = true,
-          openSystemSettings: () async => settingsOpened = true,
+          openLauncherSettings: (_) async => settingsOpened = true,
           timeWidget: const Text('12:00'),
         ),
       ),
@@ -30,7 +30,7 @@ void main() {
     expect(find.text('48% · Батарея'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('wifi_status')));
-    await tester.tap(find.byKey(const Key('system_settings')));
+    await tester.tap(find.byKey(const Key('launcher_settings')));
     expect(wifiOpened, isTrue);
     expect(settingsOpened, isTrue);
   });
@@ -48,7 +48,7 @@ void main() {
             batteryPercent: 48,
           ),
           openWifiSettings: () async {},
-          openSystemSettings: () async {},
+          openLauncherSettings: (_) async {},
           timeWidget: const Text('12:00'),
         ),
       ),

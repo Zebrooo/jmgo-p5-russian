@@ -25,6 +25,7 @@ import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/ticker_model.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/unsplash_service.dart';
+import 'package:flauncher/widgets/voice_setup_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -130,7 +131,10 @@ class FLauncherApp extends StatelessWidget {
                 }
                 return shouldPop;
               },
-              child: Actions(actions: {BackIntent: BackAction(context, systemNavigator: true)}, child: FLauncher()),
+              child: Actions(
+                actions: {BackIntent: BackAction(context, systemNavigator: true)},
+                child: VoiceSetupLauncher(child: FLauncher()),
+              ),
             ),
           ),
         ),

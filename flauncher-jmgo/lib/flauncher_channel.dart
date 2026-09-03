@@ -57,6 +57,30 @@ class FLauncherChannel {
   Future<void> startAmbientMode() async =>
       await _methodChannel.invokeMethod("startAmbientMode");
 
+  Future<Map<dynamic, dynamic>> getVoiceSetupStatus() async =>
+      (await _methodChannel.invokeMapMethod("getVoiceSetupStatus"))!;
+
+  Future<Map<dynamic, dynamic>> getVoiceDiagnostics() async =>
+      (await _methodChannel.invokeMapMethod("getVoiceDiagnostics"))!;
+
+  Future<void> openAccessibilitySettings() async =>
+      await _methodChannel.invokeMethod("openAccessibilitySettings");
+
+  Future<void> openHomeSettings() async =>
+      await _methodChannel.invokeMethod("openHomeSettings");
+
+  Future<void> openRecognizerSettings() async =>
+      await _methodChannel.invokeMethod("openRecognizerSettings");
+
+  /// Called by the native side when the microphone key was pressed while the
+  /// accessibility service is disabled, so the launcher should show the setup screen.
+  void setVoiceSetupRequestedListener(void Function()? listener) =>
+      _methodChannel.setMethodCallHandler(listener == null
+          ? null
+          : (call) async {
+              if (call.method == "openVoiceSetup") listener();
+            });
+
   void addAppsChangedListener(void Function(Map<dynamic, dynamic>) listener) =>
       _eventChannel.receiveBroadcastStream().listen((event) => listener(event));
 }

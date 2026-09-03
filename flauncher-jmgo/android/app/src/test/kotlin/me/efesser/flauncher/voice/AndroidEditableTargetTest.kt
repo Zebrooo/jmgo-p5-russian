@@ -6,7 +6,6 @@ import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -17,19 +16,28 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.TIRAMISU])
 class AndroidEditableTargetTest {
+    /**
+     * Robolectric's `getChild` hands out clones, exactly like the framework does, so nodes are
+     * identified by their view id resource name instead of object identity.
+     */
     private fun node(
         packageName: String = "video.app",
         editable: Boolean = false,
         password: Boolean = false,
         visible: Boolean = true,
         focused: Boolean = false,
+        id: String = "node",
     ): AccessibilityNodeInfo = AccessibilityNodeInfo.obtain().apply {
         this.packageName = packageName
         isEditable = editable
         isPassword = password
         setVisibleToUser(visible)
         isFocused = focused
+        viewIdResourceName = id
     }
+
+    private fun AndroidEditableTarget.findId(root: AccessibilityNodeInfo, maxNodes: Int = MAX_NODES): String? =
+        find(root, "video.app", maxNodes)?.viewIdResourceName
 
     private fun AccessibilityNodeInfo.withChildren(vararg children: AccessibilityNodeInfo) = apply {
         for (child in children) shadowOf(this).addChild(child)
@@ -37,39 +45,38 @@ class AndroidEditableTargetTest {
 
     @Test
     fun prefersTheFocusedEditableFieldOfTheOriginPackage() {
-        val fallback = node(editable = true)
-        val focused = node(editable = true, focused = true)
+        val fallback = node(editable = true, id = "fallback")
+        val focused = node(editable = true, focused = true, id = "focused")
         val root = node().withChildren(
             node().withChildren(fallback),
-            node(packageName = "other.app", editable = true, focused = true),
+            node(packageName = "other.app", editable = true, focused = true, id = "foreign"),
             focused,
         )
 
-        assertSame(focused, AndroidEditableTarget.find(root, "video.app"))
+        assertEquals("focused", AndroidEditableTarget.findId(root))
     }
 
     @Test
     fun fallsBackToAVisibleEditableFieldAndNeverToPasswordOrHiddenOnes() {
-        val fallback = node(editable = true)
+        val fallback = node(editable = true, id = "fallback")
         val root = node().withChildren(
-            node(editable = true, password = true, focused = true),
-            node(editable = true, visible = false, focused = true),
+            node(editable = true, password = true, focused = true, id = "password"),
+            node(editable = true, visible = false, focused = true, id = "hidden"),
             fallback,
         )
 
-        assertSame(fallback, AndroidEditableTarget.find(root, "video.app"))
-        assertNull(AndroidEditableTarget.find(node().withChildren(node(editable = true, password = true)), "video.app"))
+        assertEquals("fallback", AndroidEditableTarget.findId(root))
+        assertNull(AndroidEditableTarget.findId(node().withChildren(node(editable = true, password = true))))
     }
 
     @Test
     fun stopsWalkingHugeTreesAtTheNodeBudget() {
         val root = node()
         repeat(60) { root.withChildren(node()) }
-        val editable = node(editable = true, focused = true)
-        root.withChildren(editable)
+        root.withChildren(node(editable = true, focused = true, id = "deep"))
 
-        assertNull(AndroidEditableTarget.find(root, "video.app", maxNodes = 50))
-        assertSame(editable, AndroidEditableTarget.find(root, "video.app", maxNodes = 100))
+        assertNull(AndroidEditableTarget.findId(root, maxNodes = 50))
+        assertEquals("deep", AndroidEditableTarget.findId(root, maxNodes = 100))
     }
 
     @Test

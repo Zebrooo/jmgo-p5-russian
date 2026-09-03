@@ -1,6 +1,8 @@
 package org.jmgo.input.web;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -136,11 +138,11 @@ public final class WebInputControllerTest {
         controller.onPageFinished();
         controller.onResume();
 
+        // onPageFinished re-injects the runtime; nothing may probe or insert the stale result.
         String script = lastScript();
-        if (script != null) {
-            assertEquals("only the runtime install may run after navigation",
-                    WebDomScripts.install(), script);
-        }
+        assertNotEquals(WebDomScripts.hasSafeActiveElement(), script);
+        assertNotEquals(WebDomScripts.insert("устарело"), script);
+        assertFalse(script != null && script.contains("устарело"));
     }
 
     private void started(String sessionId) {

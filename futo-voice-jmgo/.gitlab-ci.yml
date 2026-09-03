@@ -1,0 +1,59 @@
+default:
+  image: "gitlab.futo.org:5050/keyboard/latinime/gradle:latest"
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_FORCE_HTTPS: "true"
+
+stages:          # List of stages for jobs, and their order of execution
+  - test
+  - buildDev
+  - buildRelease
+
+unit-test-job:
+  stage: test
+  tags:
+    - docker
+  script:
+    - ./gradlew testDevDebugUnitTest -s
+  artifacts:
+    reports:
+      junit:
+        - ./app/build/test-results/testDevDebugUnitTest/*.xml 
+
+buildDev:
+  stage: buildDev
+  tags:
+    - docker
+  script:
+    - ./setUpPropertiesCI.sh
+    - ./gradlew assembleDevRelease -s
+    - mv app/build/outputs/apk/dev/release/app-dev-release.apk ./app-release-$CI_COMMIT_SHORT_SHA.apk
+  artifacts:
+    name: "app-release-$CI_COMMIT_SHORT_SHA"
+    paths: 
+      - ./*.apk
+  when: manual
+
+buildRelease:
+  stage: buildRelease
+  tags:
+    - docker
+  script:
+    - ./setUpPropertiesCI.sh
+    - ./gradlew bundlePlayStoreRelease -s
+    - ./gradlew assembleStandaloneRelease -s
+    - ./gradlew assembleFDroidRelease -s
+    - mv app/build/outputs/bundle/playStoreRelease/app-playStore-release.aab ./playStore.aab
+    - mv app/build/outputs/apk/standalone/release/app-standalone-release.apk ./standalone.apk
+    - mv app/build/outputs/apk/fDroid/release/app-fDroid-release.apk ./fdroid.apk
+  artifacts:
+    name: "release-$CI_COMMIT_SHORT_SHA"
+    paths: 
+      - ./*.aab
+      - ./*.apk
+  only:
+    - tags
+  except:
+    - branches
+  when: manual

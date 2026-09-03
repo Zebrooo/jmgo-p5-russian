@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="native_voice_service_description">Русский голосовой ввод в активное поле поиска</string>
+    <string name="native_voice_prompt">Говорите</string>
+    <string name="native_voice_missing">Русский голосовой ввод не найден</string>
+    <string name="native_voice_no_field">Сначала выберите поле поиска</string>
+    <string name="native_voice_field_lost">Активное поле поиска потеряно</string>
+    <string name="native_voice_unavailable">Голосовой ввод недоступен</string>
+</resources>

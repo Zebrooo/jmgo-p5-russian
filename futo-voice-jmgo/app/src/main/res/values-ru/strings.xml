@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Русский голосовой ввод</string>
+    <string name="voice_input_method">Русский голосовой ввод</string>
+    <string name="recognize_activity">Русское распознавание речи</string>
+    <string name="try_saying_something">Говорите, удерживая кнопку микрофона</string>
+    <string name="no_audio_detected_is_your_microphone_blocked">Звук не поступает. Удерживайте кнопку микрофона во время речи</string>
+    <string name="listening">Слушаю…</string>
+    <string name="ending_soon_30s">Запись скоро завершится</string>
+    <string name="ending_soon_vad">Обнаружена тишина</string>
+    <string name="processing">Распознаю…</string>
+    <string name="initializing">Подготовка…</string>
+    <string name="extracting_features">Обрабатываю звук…</string>
+    <string name="running_encoder">Распознаю речь…</string>
+    <string name="decoding_started">Распознаю речь…</string>
+    <string name="switching_to_english_model">Переключаю модель…</string>
+    <string name="stop_recording">Остановить запись</string>
+    <string name="cancel">Отмена</string>
+    <string name="grant_microphone_permission_to_use_voice_input">Разрешите доступ к микрофону</string>
+    <string name="open_voice_input_settings">Открыть настройки голосового ввода</string>
+</resources>

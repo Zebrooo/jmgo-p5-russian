@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'org.jmgo.input.web'
+    compileSdk 33
+
+    defaultConfig {
+        minSdk 23
+        targetSdk 33
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+dependencies {
+    implementation project(':input-core')
+    testImplementation 'junit:junit:4.13.2'
+}

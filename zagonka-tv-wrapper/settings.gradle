@@ -1,0 +1,15 @@
+pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories { google(); mavenCentral() }
+}
+
+rootProject.name = "ZagonkaTV"
+include ":app"
+include ":input-core"
+project(":input-core").projectDir = new File(settingsDir, "../jmgo-input-modules/input-core")
+include ":web-input"
+project(":web-input").projectDir = new File(settingsDir, "../jmgo-input-modules/web-input")

@@ -1,0 +1,28 @@
+# Local configuration and credentials
+**/local.properties
+**/keystore.properties
+**/crashreporting.properties
+**/google-services.json
+**/.env
+**/.env.*
+**/*.jks
+**/*.keystore
+**/*.pem
+**/*.p12
+
+# IDE and operating-system files
+**/.idea/
+**/.vscode/
+**/.DS_Store
+
+# Generated files and build artifacts
+**/.gradle/
+**/.dart_tool/
+**/.cxx/
+**/.externalNativeBuild/
+**/build/
+**/*.apk
+**/*.aar
+!/futo-voice-jmgo/libs/*.aar
+**/*.core
+/flauncher-jmgo/core

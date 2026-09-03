@@ -24,4 +24,21 @@ public final class WebKeyPolicyTest {
         assertFalse(WebKeyPolicy.shouldHandle(22, 0, 0, true, true, false, true));
         assertFalse(WebKeyPolicy.shouldHandle(4, 0, 0, true, true, false, false));
     }
+
+    @Test
+    public void appliesVoiceResultOnlyToAResumedHostWithTheSameSafeField() {
+        assertTrue(WebVoiceResultPolicy.shouldQueue(false, true, " матрица "));
+        assertFalse(WebVoiceResultPolicy.shouldQueue(true, true, "матрица"));
+        assertFalse(WebVoiceResultPolicy.shouldQueue(false, false, "матрица"));
+        assertFalse(WebVoiceResultPolicy.shouldQueue(false, true, "   "));
+
+        assertTrue(WebVoiceResultPolicy.shouldInspect(true, true, " матрица "));
+        assertFalse(WebVoiceResultPolicy.shouldInspect(false, true, "матрица"));
+        assertFalse(WebVoiceResultPolicy.shouldInspect(true, false, "матрица"));
+        assertFalse(WebVoiceResultPolicy.shouldInspect(true, true, "   "));
+
+        assertTrue(WebVoiceResultPolicy.shouldApply(true, true));
+        assertFalse(WebVoiceResultPolicy.shouldApply(false, true));
+        assertFalse(WebVoiceResultPolicy.shouldApply(true, false));
+    }
 }

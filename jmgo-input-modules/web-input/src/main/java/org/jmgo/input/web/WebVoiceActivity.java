@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.speech.RecognizerIntent;
 import android.widget.Toast;
 import java.util.ArrayList;
@@ -46,8 +48,7 @@ public final class WebVoiceActivity extends Activity {
             startActivityForResult(intent, REQUEST_RECOGNITION);
         } catch (ActivityNotFoundException error) {
             Toast.makeText(this, "Русский голосовой ввод не найден", Toast.LENGTH_SHORT).show();
-            broadcast(InputContract.ACTION_WEB_VOICE_RESULT, "");
-            finish();
+            publishResult("");
         }
     }
 
@@ -57,8 +58,15 @@ public final class WebVoiceActivity extends Activity {
         if (requestCode != REQUEST_RECOGNITION) return;
         ArrayList<String> candidates = resultCode == RESULT_OK && data != null
                 ? data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS) : null;
-        broadcast(InputContract.ACTION_WEB_VOICE_RESULT, VoiceResult.firstNonBlank(candidates));
+        publishResult(VoiceResult.firstNonBlank(candidates));
+    }
+
+    private void publishResult(String result) {
+        Intent broadcast = resultBroadcast(result);
+        android.content.Context application = getApplicationContext();
         finish();
+        new Handler(Looper.getMainLooper()).postDelayed(
+                () -> application.sendBroadcast(broadcast), 300L);
     }
 
     private void broadcast(String action, String result) {
@@ -69,6 +77,13 @@ public final class WebVoiceActivity extends Activity {
             intent.putExtra(InputContract.EXTRA_RESULT, result);
         }
         sendBroadcast(intent);
+    }
+
+    private Intent resultBroadcast(String result) {
+        return new Intent(InputContract.ACTION_WEB_VOICE_RESULT)
+                .setPackage(getPackageName())
+                .putExtra(InputContract.EXTRA_SESSION_ID, sessionId)
+                .putExtra(InputContract.EXTRA_RESULT, result);
     }
 
     private static String validSessionId(String value) {

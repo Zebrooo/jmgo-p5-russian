@@ -92,7 +92,7 @@
             android:theme="@style/NativeVoiceCaptureTheme" />
         <service
             android:name=".voice.NativeVoiceAccessibilityService"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/native_voice_service_description"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>

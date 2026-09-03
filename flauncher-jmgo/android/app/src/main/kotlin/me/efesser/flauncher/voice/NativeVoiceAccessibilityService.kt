@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -23,6 +25,9 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
     private var originPackage: String? = null
     private var originWindowId: Int? = null
     private var resultReceiverRegistered = false
+    private val retryHandler = Handler(Looper.getMainLooper())
+    private var pendingResult: PendingResult? = null
+    private val retryResult = Runnable { tryApplyPendingResult() }
 
     private val resultReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -98,42 +103,81 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
     }
 
     private fun applyNativeResult(intent: Intent) {
+        val now = SystemClock.elapsedRealtime()
         val expectedOrigin = originPackage
-        val root = rootInActiveWindow
-        val currentPackage = root?.packageName?.toString()
-        val result = intent.getStringExtra(InputContract.EXTRA_RESULT)
         val sessionId = intent.getStringExtra(InputContract.EXTRA_SESSION_ID)
         val declaredOrigin = intent.getStringExtra(InputContract.EXTRA_ORIGIN_PACKAGE)
-        val sameWindow = originWindowId == null || root?.windowId == originWindowId
-        val accepted = sameWindow && expectedOrigin == declaredOrigin && NativeVoicePolicy.canApplyResult(
+        val result = NativeVoicePolicy.validatedResult(
             sessionGate,
             sessionId,
-            SystemClock.elapsedRealtime(),
+            now,
             expectedOrigin,
-            currentPackage,
-            result,
+            declaredOrigin,
+            intent.getStringExtra(InputContract.EXTRA_RESULT),
         )
-        if (!accepted || root == null || expectedOrigin == null) {
+        if (result == null || sessionId == null) {
             clearSession()
-            if (!result.isNullOrBlank()) {
-                Toast.makeText(this, R.string.native_voice_field_lost, Toast.LENGTH_SHORT).show()
-            }
             return
         }
 
-        val target = AndroidEditableTarget.find(root, expectedOrigin)
-        val applied = target != null && AndroidEditableTarget.setTextAndSubmit(target, result!!.trim())
-        clearSession()
-        if (!applied) Toast.makeText(this, R.string.native_voice_field_lost, Toast.LENGTH_SHORT).show()
+        pendingResult = PendingResult(sessionId, result, now + WINDOW_RESTORE_TIMEOUT_MS)
+        tryApplyPendingResult()
+    }
+
+    private fun tryApplyPendingResult() {
+        val pending = pendingResult ?: return
+        val now = SystemClock.elapsedRealtime()
+        val expectedOrigin = originPackage
+        if (expectedOrigin == null || !sessionGate.isActive(now) || now > pending.deadlineMs) {
+            clearSession()
+            Toast.makeText(this, R.string.native_voice_field_lost, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val root = rootInActiveWindow
+        val currentPackage = root?.packageName?.toString()
+        val sameWindow = originWindowId == null || root?.windowId == originWindowId
+        val target = if (root != null && currentPackage == expectedOrigin && sameWindow) {
+            AndroidEditableTarget.find(root, expectedOrigin)
+        } else {
+            null
+        }
+
+        if (!NativeVoicePolicy.isWindowReady(
+                expectedOrigin,
+                currentPackage,
+                sameWindow,
+                target != null,
+            )
+        ) {
+            scheduleRetry()
+            return
+        }
+
+        if (AndroidEditableTarget.setTextAndSubmit(target!!, pending.text)) {
+            sessionGate.accept(pending.sessionId, now)
+            clearSession()
+        } else {
+            scheduleRetry()
+        }
+    }
+
+    private fun scheduleRetry() {
+        retryHandler.removeCallbacks(retryResult)
+        retryHandler.postDelayed(retryResult, WINDOW_RETRY_INTERVAL_MS)
     }
 
     private fun clearSession() {
+        retryHandler.removeCallbacks(retryResult)
+        pendingResult = null
         sessionGate.clear()
         originPackage = null
         originWindowId = null
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (pendingResult != null) tryApplyPendingResult()
+    }
 
     override fun onInterrupt() {
         clearSession()
@@ -146,5 +190,16 @@ class NativeVoiceAccessibilityService : AccessibilityService() {
         }
         clearSession()
         super.onDestroy()
+    }
+
+    private data class PendingResult(
+        val sessionId: String,
+        val text: String,
+        val deadlineMs: Long,
+    )
+
+    private companion object {
+        const val WINDOW_RESTORE_TIMEOUT_MS = 5_000L
+        const val WINDOW_RETRY_INTERVAL_MS = 100L
     }
 }

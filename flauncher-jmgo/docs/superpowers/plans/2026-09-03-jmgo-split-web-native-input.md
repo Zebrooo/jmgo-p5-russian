@@ -195,7 +195,7 @@ Run `gradle -p /Users/dmitrii/projects/zagonka-tv-wrapper testDebugUnitTest asse
 
 **Interfaces:**
 - Consumes: Task 1 core policies and the manifest capability action.
-- Produces: accessibility service `.voice.NativeVoiceAccessibilityService` with `canRequestFilterKeyEvents=true` and `FLAG_REQUEST_FILTER_KEY_EVENTS`.
+- Produces: accessibility service `.voice.NativeVoiceAccessibilityService`, exported for Android system binding and protected by `BIND_ACCESSIBILITY_SERVICE`, with `canRequestFilterKeyEvents=true` and `FLAG_REQUEST_FILTER_KEY_EVENTS`.
 - Produces: package-scoped `InputContract.ACTION_NATIVE_VOICE_RESULT` with session ID and normalized result.
 
 - [ ] **Step 1: Add failing bridge-policy tests**
@@ -218,7 +218,7 @@ Filter only initial key `609` down. Resolve web capability in the foreground pac
 
 - [ ] **Step 4: Add manifest service configuration and launcher fallback**
 
-Declare the accessibility service as non-exported with `BIND_ACCESSIBILITY_SERVICE`. Change FLauncher's local microphone handler to launch `NativeVoiceCaptureActivity` instead of Zagonka's activity. Do not enable the service in code or settings.
+Declare the accessibility service as exported for Android system binding and protect it with `BIND_ACCESSIBILITY_SERVICE`. Change FLauncher's local microphone handler to launch `NativeVoiceCaptureActivity` instead of Zagonka's activity. Do not enable the service in code or settings.
 
 - [ ] **Step 5: Run Android unit tests and APK build**
 

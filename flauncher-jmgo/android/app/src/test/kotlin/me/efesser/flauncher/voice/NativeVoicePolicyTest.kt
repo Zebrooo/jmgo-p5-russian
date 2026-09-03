@@ -22,30 +22,49 @@ class NativeVoicePolicyTest {
         assertEquals(VoiceRoute.NATIVE, NativeVoicePolicy.route("video.app", false))
     }
 
-    @Test fun acceptsOnlyMatchingPackageSessionAndNonblankResult() {
+    @Test fun validatesResultEnvelopeWithoutConsumingTheSession() {
         val gate = VoiceSessionGate(60_000)
         assertTrue(gate.start("session-a", 1_000))
-        assertTrue(NativeVoicePolicy.canApplyResult(
+        assertEquals("матрица", NativeVoicePolicy.validatedResult(
             gate, "session-a", 2_000, "video.app", "video.app", " матрица ",
         ))
+        assertTrue(gate.isActive(2_001))
 
-        assertTrue(gate.start("session-b", 3_000))
-        assertFalse(NativeVoicePolicy.canApplyResult(
-            gate, "session-b", 4_000, "video.app", "other.app", "матрица",
+        assertEquals(null, NativeVoicePolicy.validatedResult(
+            gate, "session-a", 2_002, "video.app", "other.app", "матрица",
+        ))
+        assertEquals(null, NativeVoicePolicy.validatedResult(
+            gate, "session-a", 2_003, "video.app", "video.app", "   ",
+        ))
+        assertEquals(null, NativeVoicePolicy.validatedResult(
+            gate, "wrong", 2_004, "video.app", "video.app", "матрица",
         ))
         gate.clear()
-
-        assertTrue(gate.start("session-c", 5_000))
-        assertFalse(NativeVoicePolicy.canApplyResult(
-            gate, "session-c", 6_000, "video.app", "video.app", "   ",
+        assertEquals(null, NativeVoicePolicy.validatedResult(
+            gate, null, 2_005, "video.app", "video.app", "матрица",
         ))
     }
 
     @Test fun rejectsExpiredSession() {
         val gate = VoiceSessionGate(60_000)
         assertTrue(gate.start("session-a", 1_000))
-        assertFalse(NativeVoicePolicy.canApplyResult(
+        assertEquals(null, NativeVoicePolicy.validatedResult(
             gate, "session-a", 61_001, "video.app", "video.app", "матрица",
+        ))
+    }
+
+    @Test fun waitsForTheOriginalEditableWindowBeforeApplying() {
+        assertFalse(NativeVoicePolicy.isWindowReady(
+            "video.app", "org.futo.voiceinput.jmgo", true, true,
+        ))
+        assertFalse(NativeVoicePolicy.isWindowReady(
+            "video.app", "video.app", false, true,
+        ))
+        assertFalse(NativeVoicePolicy.isWindowReady(
+            "video.app", "video.app", true, false,
+        ))
+        assertTrue(NativeVoicePolicy.isWindowReady(
+            "video.app", "video.app", true, true,
         ))
     }
 }

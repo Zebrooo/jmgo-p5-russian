@@ -12,16 +12,26 @@ object NativeVoicePolicy {
     fun route(foregroundPackage: String?, resolvesWebVoice: Boolean): VoiceRoute =
         VoiceRoutePolicy.select(!foregroundPackage.isNullOrBlank(), resolvesWebVoice)
 
-    fun canApplyResult(
+    fun validatedResult(
         gate: VoiceSessionGate,
         sessionId: String?,
         nowMs: Long,
         originPackage: String?,
-        currentPackage: String?,
+        declaredOriginPackage: String?,
         result: String?,
-    ): Boolean {
-        if (originPackage.isNullOrBlank() || originPackage != currentPackage) return false
-        if (result.isNullOrBlank()) return false
-        return gate.accept(sessionId, nowMs)
+    ): String? {
+        if (originPackage.isNullOrBlank() || originPackage != declaredOriginPackage) return null
+        if (sessionId.isNullOrBlank()) return null
+        if (result.isNullOrBlank()) return null
+        if (gate.currentSessionId(nowMs) != sessionId) return null
+        return result.trim()
     }
+
+    fun isWindowReady(
+        originPackage: String?,
+        currentPackage: String?,
+        sameWindow: Boolean,
+        hasEditableTarget: Boolean,
+    ): Boolean = !originPackage.isNullOrBlank() &&
+        originPackage == currentPackage && sameWindow && hasEditableTarget
 }

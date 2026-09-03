@@ -38,6 +38,8 @@ public final class WebInputController {
     private boolean fullscreen;
     private boolean editableFocused;
     private boolean receiverRegistered;
+    private String pendingVoiceSessionId;
+    private String pendingVoiceResult;
 
     private final BroadcastReceiver voiceReceiver = new BroadcastReceiver() {
         @Override
@@ -48,14 +50,16 @@ public final class WebInputController {
                 voiceSession.start(sessionId, now);
                 return;
             }
-            if (!InputContract.ACTION_WEB_VOICE_RESULT.equals(intent.getAction())
-                    || !voiceSession.accept(sessionId, now)) return;
+            if (!InputContract.ACTION_WEB_VOICE_RESULT.equals(intent.getAction())) return;
             String result = intent.getStringExtra(InputContract.EXTRA_RESULT);
-            if (result == null || result.trim().isEmpty()) return;
-            webView.evaluateJavascript(WebDomScripts.hasSafeActiveElement(), value -> {
-                if ("true".equals(value)) webView.evaluateJavascript(siteAdapter.insertScript(result.trim()), null);
-                else Toast.makeText(activity, "Активное поле поиска потеряно", Toast.LENGTH_SHORT).show();
-            });
+            boolean sessionMatches = sessionId != null
+                    && sessionId.equals(voiceSession.currentSessionId(now));
+            if (WebVoiceResultPolicy.shouldQueue(resumed, sessionMatches, result)) {
+                pendingVoiceSessionId = sessionId;
+                pendingVoiceResult = result.trim();
+                return;
+            }
+            deliverVoiceResult(sessionId, result, now);
         }
     };
 
@@ -109,6 +113,7 @@ public final class WebInputController {
     public void onPageFinished() {
         if (!attached) return;
         voiceSession.clear();
+        clearPendingVoiceResult();
         editableFocused = false;
         hideKeyboard();
         try {
@@ -164,13 +169,17 @@ public final class WebInputController {
         updateCursorVisibility();
     }
 
-    public void onResume() { resumed = true; }
+    public void onResume() {
+        resumed = true;
+        deliverPendingVoiceResult();
+    }
 
     public void onPause() { resumed = false; }
 
     public void destroy() {
         resumed = false;
         voiceSession.clear();
+        clearPendingVoiceResult();
         if (receiverRegistered) {
             activity.unregisterReceiver(voiceReceiver);
             receiverRegistered = false;
@@ -203,6 +212,7 @@ public final class WebInputController {
             return;
         }
         String sessionId = UUID.randomUUID().toString();
+        clearPendingVoiceResult();
         if (!voiceSession.start(sessionId, now)) return;
         Intent intent = new Intent(InputContract.ACTION_WEB_VOICE)
                 .setPackage(activity.getPackageName())
@@ -214,6 +224,33 @@ public final class WebInputController {
             voiceSession.clear();
             Toast.makeText(activity, "Голосовой ввод недоступен", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void deliverPendingVoiceResult() {
+        if (pendingVoiceSessionId == null || pendingVoiceResult == null) return;
+        String sessionId = pendingVoiceSessionId;
+        String result = pendingVoiceResult;
+        clearPendingVoiceResult();
+        deliverVoiceResult(sessionId, result, SystemClock.elapsedRealtime());
+    }
+
+    private void deliverVoiceResult(String sessionId, String result, long now) {
+        boolean sessionAccepted = voiceSession.accept(sessionId, now);
+        if (!WebVoiceResultPolicy.shouldInspect(resumed, sessionAccepted, result)) return;
+        String normalizedResult = result.trim();
+        webView.evaluateJavascript(WebDomScripts.hasSafeActiveElement(), value -> {
+            boolean safeElementActive = "true".equals(value);
+            if (WebVoiceResultPolicy.shouldApply(resumed, safeElementActive)) {
+                webView.evaluateJavascript(siteAdapter.insertScript(normalizedResult), null);
+            } else if (resumed) {
+                Toast.makeText(activity, "Активное поле поиска потеряно", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void clearPendingVoiceResult() {
+        pendingVoiceSessionId = null;
+        pendingVoiceResult = null;
     }
 
     private void showKeyboard() {

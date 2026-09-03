@@ -81,11 +81,11 @@ The cursor remains disabled by default and toggles only on the remote Menu butto
 
 ### Web voice flow
 
-The manifest-provided web voice activity launches FUTO with language `ru-RU`. It publishes a package-scoped result back to the resumed `WebInputController`, which inserts the normalized result into the currently active safe DOM element. Cancellation makes no DOM change. The controller refuses stale results after navigation, loss of focus, or session timeout.
+The manifest-provided web voice activity launches FUTO with language `ru-RU`. After the transparent activity finishes, it publishes a package-scoped result back to `WebInputController`. A valid result that arrives while the host is paused is held in memory and processed on resume; it is never inserted while paused. The controller then revalidates the session and active safe DOM element, refusing stale results after navigation, loss of focus, or timeout. Cancellation makes no DOM change.
 
 ## Native voice bridge
 
-FLauncher owns `NativeVoiceAccessibilityService` and `NativeVoiceCaptureActivity`.
+FLauncher owns `NativeVoiceAccessibilityService` and `NativeVoiceCaptureActivity`. The service is exported so Android can bind to it, and is protected by `BIND_ACCESSIBILITY_SERVICE` so only the system can bind.
 
 The accessibility service requests key filtering and consumes only the accepted microphone press. All other key events return `false` unchanged. On an accepted press it records only the originating package and window identity, resolves web capability, and routes as described above.
 
@@ -98,7 +98,7 @@ Insertion proceeds only when all of these remain true:
 - a visible editable non-password node is available;
 - the result is nonblank.
 
-The service calls `ACTION_SET_TEXT`. On Android 11 or newer it then calls `ACTION_IME_ENTER` only when the target node advertises that action. Otherwise it leaves the inserted text in the field so the application's native confirmation continues to work. It does not search for or click arbitrary buttons.
+The service waits briefly for the originating window to return, then calls `ACTION_SET_TEXT`. On Android 11 or newer it calls `ACTION_IME_ENTER` only when the target node advertises that action. Otherwise it leaves the inserted text in the field so the application's native confirmation continues to work. It does not search for or click arbitrary buttons.
 
 While FLauncher itself is foreground, its existing `dispatchKeyEvent` handler remains a fallback for installations where the accessibility service is disabled. It launches the same native capture activity and uses the same session gate, avoiding a second voice implementation.
 

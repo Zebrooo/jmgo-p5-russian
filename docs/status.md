@@ -44,12 +44,19 @@
   автопоказ, канал, настройка (Flutter).
 - GitHub Actions `ci.yml` для Node, Gradle/Zagonka, FLauncher (Flutter 3.7.5 + Gradle) и FUTO (NDK), корневой
   `scripts/build-all.sh`, README с порядком установки и удаления.
+- Robolectric-тесты (запускаются в CI под AGP): манифест web-input резолвит `WEB_VOICE` на экспортированную
+  `WebVoiceActivity`; `WebVoiceActivity` и `NativeVoiceCaptureActivity` шлют package-scoped broadcast с UUID,
+  origin и первой непустой фразой, отказывают на кривой UUID и чужой action; `WebInputController` держит результат
+  в паузе и вставляет после resume, отбрасывает небезопасное поле, чужую/устаревшую сессию, повтор, отмену и
+  результат после навигации; манифест FLauncher: сервис `exported=true` с `BIND_ACCESSIBILITY_SERVICE` и meta-data,
+  capture-активити не экспортирована, лаунчер не web-хост; `WebCapabilityResolver`; `AndroidEditableTarget`
+  (фокус, fallback, password/hidden, лимит узлов, `ACTION_SET_TEXT`, `ACTION_IME_ENTER` только при поддержке);
+  `<queries>` FLauncher и Zagonka.
 
 ## Что не реализовано
 
 - Проверка на реальном JMGO P5 (P0): всё ниже основано на коде и JVM/Flutter-тестах.
-- Robolectric/instrumentation-тесты объединённого манифеста, pause/resume `WebVoiceActivity`, `ACTION_SET_TEXT`,
-  package visibility (CI проверяет только exported/permission сервиса через `aapt2` по собранному APK).
+- Instrumentation-тесты на устройстве или эмуляторе (Robolectric-покрытие есть, см. ниже).
 - WebView: Shadow DOM, same-origin iframe, React/Vue controlled inputs без `beforeinput`, `InputEvent.inputType`,
   отказ от `document.execCommand` для contenteditable, реестр site adapters, адаптивные размеры клавиатуры под
   overscan, настройки скорости курсора, long press и drag.
@@ -86,10 +93,10 @@
 | --- | --- |
 | DOM-тесты Node | 6/6 |
 | input-core JUnit | 17/17 |
-| web-input JUnit | 8/8 |
-| Zagonka JUnit | 7/7 |
-| FLauncher Kotlin JUnit | 22/22 |
+| web-input JUnit + Robolectric (CI) | 8/8 локально, 21/21 в CI |
+| Zagonka JUnit | 8/8 |
+| FLauncher Kotlin JUnit + Robolectric (CI) | 24/24 локально, 39/39 в CI |
 | FLauncher `flutter analyze` | без замечаний |
 | FLauncher `flutter test` | 142/142 |
 | Компиляция Java/Kotlin против android-all 13 | без ошибок |
-| Gradle `assembleDebug` всех компонентов | зелёный в GitHub Actions (run 33747951587 на `main`, коммит `4f76583`) |
+| Gradle `assembleDebug` всех компонентов | зелёный в GitHub Actions (run 33750692498, коммит `d96e96e`) |
